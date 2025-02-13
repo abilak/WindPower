@@ -1,0 +1,1 @@
+# function to preprocess data for CNN and LSTM (may requrie different steps, if so, make diff functions for each)
