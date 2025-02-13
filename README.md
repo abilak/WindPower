@@ -1,1 +1,3 @@
 # WindPower
+
+add cli
