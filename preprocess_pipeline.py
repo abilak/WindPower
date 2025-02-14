@@ -54,7 +54,7 @@ def preprocess_data_cnn(data, feature_selection = 5):
     data['winddirection_100m'] = np.cos(data['winddirection_100m'] * np.pi / 180)
     target = data['Power']
     rest = data.drop('Power')
-    # normalize
+    # normalize - now that i think about it... we should be cautious on scaling (do research)
     scaler = MinMaxScaler()
     cols = target.columns 
     rest = scaler.fit_transform(rest)
