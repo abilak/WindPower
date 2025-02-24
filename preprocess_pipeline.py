@@ -3,6 +3,9 @@ from sklearn.feature_selection import SelectKBest, chi2
 import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
+from statsmodels.tsa.deterministic import DeterministicProcess
+import tensorflow as tf 
+from sklearn.model_selection import train_test_split
 # function to preprocess data for CNN and LSTM (may require different steps, if so, make diff functions for each)
 
 '''
@@ -33,36 +36,79 @@ SEASONAL FEATURES - temperature_2m, dewpoint_2m
 # good place to look: https://www.kaggle.com/learn/time-series. not great tbh to learn models, but good for data processing
 
 df = pd.read_csv('data/Location1.csv')
-feature = 'windgusts_10m'
-df = df[['Time', feature]]
 df['Time'] = pd.to_datetime(df['Time'])
 df.set_index('Time', inplace=True)
-df = df.resample('W').mean()
-plt.figure(figsize=(10, 6))
-plt.plot(df.index, df[feature], marker='o', linestyle='-', color='b')
-plt.title('Timestamp vs Target Variable')
-plt.xlabel('Timestamp')
-plt.ylabel('Target')
-plt.xticks(rotation=45)
-plt.grid(True)
-plt.tight_layout()
-plt.show()
-def preprocess_data_cnn(data, feature_selection = 5): 
-    '''Input as csv'''
-    data = data.drop('Timestamp', axis = 1) # we
-    data['winddirection_10m'] = np.cos(data['winddirection_10m'] * np.pi / 180) # maybe get rid of cosine transformation
-    data['winddirection_100m'] = np.cos(data['winddirection_100m'] * np.pi / 180)
-    target = data['Power']
-    rest = data.drop('Power')
-    # normalize - now that i think about it... we should be cautious on scaling (do research)
-    scaler = MinMaxScaler()
-    cols = target.columns 
-    rest = scaler.fit_transform(rest)
-    rest = pd.DataFrame(rest, columns = cols)
-    
-    # select best features 
-    select_k_best = SelectKBest(score_func=chi2, k=feature_selection)
-    rest = select_k_best.fit_transform(rest, target)
-    
-    
-    
+
+df = np.array(df.values)
+def split_sequences(sequences, n_steps):
+	X, y = list(), list()
+	for i in range(len(sequences)):
+		# find the end of this pattern
+		end_ix = i + n_steps
+		# check if we are beyond the dataset
+		if end_ix > len(sequences):
+			break
+		# gather input and output parts of the pattern
+		seq_x, seq_y = sequences[i:end_ix, :-1], sequences[end_ix-1, -1]
+		X.append(seq_x)
+		y.append(seq_y)
+	return np.array(X), np.array(y)
+
+n_steps = 52
+train, dev, test = np.split(df, [int(len(df) * 0.6), int(len(df) * 0.8)])
+
+X_train, y_train = train[:,:-1], train[:, -1]
+X_val, y_val = dev[:,:-1], dev[:, -1]
+X_test, y_test = test[:, :-1], test[:, -1]
+scaler = MinMaxScaler() 
+X_train = scaler.fit_transform(X_train)
+X_val = scaler.transform(X_val)
+X_test = scaler.transform(X_test)
+train_data, dev_data, test_data = np.hstack((X_train, y_train.reshape((-1, 1)))), np.hstack((X_val, y_val.reshape((-1, 1)))), np.hstack((X_test, y_test.reshape((-1, 1))))
+X_train, y_train = split_sequences(train_data, n_steps)
+X_val, y_val = split_sequences(dev_data, n_steps)
+X_test, y_test = split_sequences(test_data, n_steps)
+
+'''
+model = tf.keras.Sequential()
+model.add(tf.keras.layers.Conv1D(filters=128, kernel_size=2, activation='relu', input_shape=(n_steps, 8)))
+model.add(tf.keras.layers.MaxPooling1D(pool_size=2))
+model.add(tf.keras.layers.Conv1D(filters=64, kernel_size=1, activation='relu'))
+model.add(tf.keras.layers.MaxPooling1D(pool_size=1))
+model.add(tf.keras.layers.Flatten())
+model.add(tf.keras.layers.Dense(256, activation='relu'))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Dense(64, activation='relu'))
+model.add(tf.keras.layers.Dense(32, activation='relu'))
+model.add(tf.keras.layers.Dense(16, activation='relu'))
+model.add(tf.keras.layers.Dense(1))
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate = 3e-4), loss='mse', metrics = [tf.keras.metrics.RootMeanSquaredError()])
+model.fit(X_train, y_train, validation_data = (X_val, y_val), epochs = 50, batch_size = 200)
+'''
+
+model = tf.keras.Sequential()
+model.add(tf.keras.layers.LSTM(128, return_sequences=True, input_shape=(n_steps, 8)))
+model.add(tf.keras.layers.LSTM(64, return_sequences=False))
+model.add(tf.keras.layers.Dense(25))
+model.add(tf.keras.layers.Dense(1))
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate = 3e-4), loss='mean_squared_error', metrics = [tf.keras.metrics.RootMeanSquaredError()])
+print(model.summary())
+#Train the model
+model.fit(X_train, y_train, batch_size=1, epochs=5, validation_data=(X_val, y_val))
+
+preds = model.predict(X_train)
+y_train = y_train-preds 
+
+model2 = tf.keras.Sequential()
+model2.add(tf.keras.layers.LSTM(128, return_sequences=True, input_shape=(n_steps, 8)))
+model2.add(tf.keras.layers.LSTM(64, return_sequences=False))
+model2.add(tf.keras.layers.Dense(25))
+model2.add(tf.keras.layers.Dense(1))
+model2.compile(optimizer=tf.keras.optimizers.Adam(learning_rate = 3e-4), loss='mean_squared_error', metrics = [tf.keras.metrics.RootMeanSquaredError()])
+print(model2.summary())
+
+model2.fit(X_train, y_train, batch_size=1, epochs=5)
+
+final_preds = model.predict(X_test) + model2.predict(X_test)
+
+print()
