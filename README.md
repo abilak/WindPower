@@ -9,4 +9,4 @@ LSTM:
 Run the one_feature_pipeline.py (the LSTM model), by doing "python3 one_feature_pipeline.py --data_path [insert path to data]"
 
 Neural ODE: 
-For the neural ode, do "python3 neural_ode.py". To test on different datasets, go to line 258 and change the data path it refers to, and then run the code.
+For the neural ode, do "python3 neural_ode.py". To test on different datasets, go to line 228 and change the data path it refers to, and then run the code.
