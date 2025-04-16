@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-'''
+
 plt.rc("figure", autolayout=True, figsize=(11, 5))
 plt.rc(
     "axes",
@@ -25,20 +25,22 @@ df = df[['Time', feature]]
 df['Time'] = pd.to_datetime(df['Time'])
 df.set_index('Time', inplace=True)
 df = df.resample('W').mean()
+print(df)
 
 moving_average = df.rolling(
     window=14,       
     center=True,      # puts the average at the center of the window
     min_periods=7,  # choose about half the window size
 ).mean()              # compute the mean (could also do median, std, min, max, ...)
-
+print(moving_average)
 ax = df.plot(style=".", color="0.5")
 moving_average.plot(
     ax=ax, linewidth=3, title="Power - Weekly", legend=False,
 );
 plt.show()
-'''
 
+
+'''
 df = pd.read_csv('data/Location1.csv')
 feature = 'Power'
 df = df[['Time', feature]]
@@ -82,3 +84,4 @@ def plot_periodogram(ts, detrend='linear', ax=None):
     return ax
 ax = plot_periodogram(df.Power)
 plt.show()
+'''
